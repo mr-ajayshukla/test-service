@@ -1,0 +1,195 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.owasp:dependency-check-gradle:6.5.0.1'
+    }
+}
+
+plugins {
+	id 'org.springframework.boot' version '2.6.1'
+	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+	id "org.sonarqube" version "3.3"
+	id 'java'
+	id 'jacoco'
+    id 'org.myire.munge' version '1.1'
+}
+
+apply plugin: 'org.owasp.dependencycheck'
+dependencyCheck {
+    format='ALL'
+    analyzers {
+    	ossIndexEnabled = false
+    }
+}
+
+ext {
+    springBootVersion = '2.6.1'
+    commonsLang3Version = '3.9'
+    springOpenApiVersion = '1.6.1'
+    httpVersion = '4.5.13'
+    jsonVersion = '20210307'
+    commonsIoVersion = '2.7'
+    retryVersion = '1.3.1'
+    javaxValidationVersion = '2.6.1'
+    jjwtVersion = '0.11.2'
+    mysqlConnectorJavaVersion = '8.0.27'
+    hibernateCoreVersion = '5.6.1.Final'
+    awsSDKVersion = '2.17.95'
+    log4j2 = '2.16.0'
+    flywaydbVersion = '8.3.0'
+}
+
+def devEnvironment = 'develop'
+
+
+
+group = 'il'
+version = buildversion
+sourceCompatibility = '17'
+
+springBoot {
+	buildInfo()
+}
+
+
+configurations {
+	all {
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+    }
+    
+    compile.exclude group:'ch.qos.logback', module: 'logback-classic'
+	
+	developmentOnly
+	runtimeClasspath {
+		extendsFrom developmentOnly
+	}
+}
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+    resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
+}
+
+jar {
+	archiveBaseName = 'test-service'
+	archiveVersion = project.version
+}
+
+compileJava {
+    sourceCompatibility = 17
+    targetCompatibility = 17
+}
+
+
+repositories {
+	mavenLocal()	
+    mavenCentral()
+
+}
+
+
+dependencies {
+	
+
+	implementation('org.springframework.boot:spring-boot-starter') {
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+    }
+    implementation "org.springframework.retry:spring-retry:${retryVersion}"
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+	implementation 'com.google.code.findbugs:jsr305:3.0.0' 
+	implementation "org.apache.commons:commons-lang3:${commonsLang3Version}"
+    implementation "org.apache.httpcomponents:httpclient:${httpVersion}"
+    implementation "org.json:json:${jsonVersion}"
+ 	implementation 'com.github.ben-manes.caffeine:caffeine'
+	implementation "org.springdoc:springdoc-openapi-ui:${springOpenApiVersion}"
+	implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
+    implementation "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
+    implementation "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation "org.hibernate:hibernate-core:${hibernateCoreVersion}"
+    implementation platform("software.amazon.awssdk:bom:${awsSDKVersion}")
+    implementation "software.amazon.awssdk:secretsmanager"
+    implementation "org.springframework.boot:spring-boot-starter-validation:${javaxValidationVersion}"
+    implementation "org.flywaydb:flyway-core:${flywaydbVersion}"
+    implementation "org.flywaydb:flyway-mysql:${flywaydbVersion}"   
+    
+	compile "commons-io:commons-io:${commonsIoVersion}"
+	implementation "mysql:mysql-connector-java:${mysqlConnectorJavaVersion}"
+	
+	runtimeOnly 'com.h2database:h2'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	
+	testCompileOnly 'org.projectlombok:lombok'
+	testAnnotationProcessor 'org.projectlombok:lombok'
+	testImplementation('org.springframework.boot:spring-boot-starter-test') {
+		exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+	}
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
+    }
+}
+    
+jacoco {
+    toolVersion = "0.8.7"
+    reportsDir = file("${project.buildDir}/report")
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.0
+            }
+        }
+
+        rule {
+            enabled = false
+            element = 'CLASS'
+            includes = ['il.*']
+
+            limit {
+                counter = 'LINE'
+                value = 'TOTALCOUNT'
+                maximum = 0.3
+            }
+        }
+    }
+}
+
+jacocoTestReport {
+    reports {
+        xml.enabled true
+        csv.enabled false
+        html.enabled true
+    }
+}
+
+transform {
+    failOnError = true
+    saxon {
+        sources ('build/reports/dependency-check-report.xml') {
+            exclude '*.xsd'
+        }
+        template 'transform/dependency-check-transform.xsl'
+        outputDir = '.'
+    }
+}
+
+
+test.finalizedBy jacocoTestReport
+check.dependsOn jacocoTestCoverageVerification
+
+test {
+    useJUnitPlatform()
+}

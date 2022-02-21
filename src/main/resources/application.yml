@@ -1,0 +1,7 @@
+
+  
+server:
+  servlet:
+    context-path: /test-service
+  port: 9003
+
